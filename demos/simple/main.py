@@ -5,13 +5,14 @@ import pathlib
 import sys
 import types
 
-sys.path.insert(0, '../..')
-
 import pyflexconfig
 
-config = types.SimpleNamespace()
-config.
+config = types.SimpleNamespace(
+    # Option: You may add hardcoded options here
+    FOURTH_OPTION={"anything": "tou want"}
+)
 
+# Compute the absolute path to the default settings module (belt and braces)
 default_settings_path = pathlib.Path(__file__).resolve().parent / "defaultsettings.py"
 
 pyflexconfig.bootstrap(config, defaults_path=default_settings_path)

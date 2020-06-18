@@ -36,6 +36,11 @@ __license__ = "MIT"
 PathOrStr = typing.Union[str, pathlib.Path]
 
 
+def pure_python_parser(source_path: PathOrStr) -> typing.Dict[str, typing.Any]:
+    """Parses a Python file in a sandbox and provides its globals in a dict"""
+    return runpy.run_path(source_path)
+
+
 def keep_upper_names(config: types.SimpleNamespace) -> None:
     """Remove disallowed option names from a config object, the default ``filter_`` option of the ``bootstrap()`` main
     function.
@@ -65,6 +70,7 @@ NAMES_BLACKLIST = ("__builtins__", "__cached__", "__doc__", "__file__", "__loade
 
 def bootstrap(
         config: types.SimpleNamespace,
+        parser: typing.Callable = pure_python_parser,
         defaults_path: typing.Optional[PathOrStr] = None,
         custom_path: typing.Optional[PathOrStr] = None,
         custom_path_envvar: str = None,
@@ -76,6 +82,7 @@ def bootstrap(
 
     Args:
         config: The global configuration namespace to populate, May bepre-populated.
+        parser: (Optional) options file parser.
         defaults_path: (Optional) path to the default config file.
         custom_path: (Optional) path to a custom config file
         custom_path_envvar: (Optional) environment variable name that contains the config path.
@@ -83,8 +90,14 @@ def bootstrap(
                  Defaults to ``keep_upper_names```. See this function for required signature.
         validator: (Optional) validation callable that takes a config SimpleNamespace and
                    issues warnings or raises exceptions on invalid configuration options.
+                   Note that the validator can change or add arbitrary options.
 
     Notes:
+
+        If ``parser`` is provided, it must be a callable object that takes a file path object
+        (of a configuration file) and returns a configuration dict whick keys are the option
+        names. The default ``parser`` is the stdlib function ``runpy.run_path``
+
         If both ``custom_path`` and ``custom_path_envvar`` are provided, the second one is ignored.
         In both case the values from the custom config file replace the ones of same name from the
         default config file.
@@ -96,7 +109,7 @@ def bootstrap(
 
     # Handling options provided by "default_path"
     if defaults_path:
-        default_options = runpy.run_path(defaults_path)
+        default_options = parser(defaults_path)
         for name, value in blacklisted_removed(default_options):
             setattr(config, name, value)
 
@@ -107,7 +120,7 @@ def bootstrap(
         selected_conf_path = pathlib.Path(selected_conf_path)
         if selected_conf_path.is_file():
             LOG.debug(f"Will load custom config file {selected_conf_path}")
-            custom_options = runpy.run_path(selected_conf_path)
+            custom_options = parser(selected_conf_path)
             for name, value in blacklisted_removed(custom_options):
                 setattr(config, name, value)
         else:
