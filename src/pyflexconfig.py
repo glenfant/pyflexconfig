@@ -2,14 +2,19 @@
 ============
 pyflexconfig
 ============
+
+A simple and flexible app configuration data provider.
+
+Please read the README, the docstrings here, the tests and the ``demos/`` directory of the source bundle for more
+documentation.
 """
 import logging
+import os
 import pathlib
 import runpy
 import types
 import typing
 
-import dotenv
 import pkg_resources
 
 # Custom logger
@@ -30,8 +35,14 @@ __license__ = "MIT"
 
 PathOrStr = typing.Union[str, pathlib.Path]
 
+
 def keep_upper_names(config: types.SimpleNamespace) -> None:
-    """Remove disallowed option names, the default options filter"""
+    """Remove disallowed option names from a config object, the default ``filter_`` option of the ``bootstrap()`` main
+    function.
+
+    Args:
+        config: The config object
+    """
 
     def name_rejected(name: str) -> bool:
         """True if not an allowed option name.
@@ -42,36 +53,70 @@ def keep_upper_names(config: types.SimpleNamespace) -> None:
         return name.startswith("_") or name.upper() != name
 
     # Remove "illegal" option names.
-    for name in vars(config):
+    for name in tuple(vars(config)):
         if name_rejected(name):
             delattr(config, name)
 
 
+# These are Python automatic attribs we don't want whatever.
+NAMES_BLACKLIST = ("__builtins__", "__cached__", "__doc__", "__file__", "__loader__", "__name__", "__package__",
+                   "__spec__")
+
+
 def bootstrap(
-    config: types.SimpleNamespace,
-    defaults_path: typing.Optional[PathOrStr] = None,
-    custom_path: typing.Optional[PathOrStr] = None,
-    config_file_envvar: str = None,
-    filter: typing.Callable = keep_upper_names,
-    validator: typing.Optional[typing.Callable] = None,
+        config: types.SimpleNamespace,
+        defaults_path: typing.Optional[PathOrStr] = None,
+        custom_path: typing.Optional[PathOrStr] = None,
+        custom_path_envvar: str = None,
+        filter_: typing.Optional[typing.Callable] = keep_upper_names,
+        validator: typing.Optional[typing.Callable] = None,
 ) -> None:
     """
     Bootstrap the configuration object populating the `config` namespace.
 
     Args:
-        config: The global configuration namespace to populate,
-
-    Kwargs:
-        defaults_path: Optional path to the default config file.
-        custom_path: Optional
-        config_file_envvar: Optional environment variable name that 
-        filter_: Optional filtering callable that removes from a config SimpleNamespace unwanted
-                 options. Default behaviour is to keep only UPPERCASE options.
-        validator: Optional validation callable that takes a config SimpleNamespace and
+        config: The global configuration namespace to populate, May bepre-populated.
+        defaults_path: (Optional) path to the default config file.
+        custom_path: (Optional) path to a custom config file
+        custom_path_envvar: (Optional) environment variable name that contains the config path.
+        filter_: (Optional) options name filter callable that removes unwanted options.
+                 Defaults to ``keep_upper_names```. See this function for required signature.
+        validator: (Optional) validation callable that takes a config SimpleNamespace and
                    issues warnings or raises exceptions on invalid configuration options.
-    
-    Note:
-        if both ``custom_path`` and ``config_file_envvar`` are provided, the second one is ignored.
+
+    Notes:
+        If both ``custom_path`` and ``custom_path_envvar`` are provided, the second one is ignored.
+        In both case the values from the custom config file replace the ones of same name from the
+        default config file.
     """
+
+    def blacklisted_removed(option: typing.Dict[str, typing.Any]) -> typing.Iterator[typing.Tuple[str, typing.Any]]:
+        """Removes elements from blacklist"""
+        return ((name, value) for name, value in option.items() if name not in NAMES_BLACKLIST)
+
+    # Handling options provided by "default_path"
     if defaults_path:
-        default_options = runpy.run_path()
+        default_options = runpy.run_path(defaults_path)
+        for name, value in blacklisted_removed(default_options):
+            setattr(config, name, value)
+
+    # Handling custom options
+    selected_conf_path = os.getenv(custom_path_envvar, None) if custom_path_envvar else None
+    selected_conf_path = custom_path or selected_conf_path
+    if selected_conf_path:
+        selected_conf_path = pathlib.Path(selected_conf_path)
+        if selected_conf_path.is_file():
+            LOG.debug(f"Will load custom config file {selected_conf_path}")
+            custom_options = runpy.run_path(selected_conf_path)
+            for name, value in blacklisted_removed(custom_options):
+                setattr(config, name, value)
+        else:
+            LOG.error(f"Custom config file {selected_conf_path} does not exist. Ignoring it...")
+
+    # Apply the potential ``filter_``
+    if callable(filter_):
+        filter_(config)
+
+    # Validating the config if validator provided
+    if callable(validator):
+        validator(config)
