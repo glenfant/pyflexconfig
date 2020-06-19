@@ -1,5 +1,7 @@
 # pyflexconfig
 
+------------
+
 - You prefer using direct Python files to provide configuration data to your Python application,
   just because you can provide any object type you'd prefer in your configuration file.
 
@@ -29,7 +31,7 @@ management game that fulfills these requirements.
   using a `types.SimpleNamespace` object but anything may do the job.
 
 - You may provide the custom configuration file either through conventional places
-  (`/etc/my_custom_config.py`), explicitly through a dedicated command line option, or through an
+  (ie. `/etc/my_custom_config.py`), explicitly through a dedicated command line option, or through an
   environment variable.
 
 - The default filter keeps only UPPERCASED options not starting with an underscore. This allows to
@@ -55,7 +57,8 @@ stdlib.
 
 ### Develop on a fork of pyflexconfig
 
-Of course, provide and activate a dedicated virtual environment with python 3.6 or later, fork `pyflexconfig` :
+Of course, provide and activate a dedicated virtual environment with python 3.6 or later, fork
+`pyflexconfig`, then:
 
 ```console
 git clone <your fork URL>
