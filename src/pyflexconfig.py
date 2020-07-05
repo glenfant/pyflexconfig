@@ -38,7 +38,7 @@ PathOrStr = typing.Union[str, pathlib.Path]
 
 def pure_python_parser(source_path: PathOrStr) -> typing.Dict[str, typing.Any]:
     """Parses a Python file in a sandbox and provides its globals in a dict"""
-    return runpy.run_path(source_path)
+    return runpy.run_path(str(source_path))
 
 
 def keep_upper_names(config: types.SimpleNamespace) -> None:
